@@ -25,3 +25,8 @@ class FieldEmptyError(Error):
     @property
     def message(self):
         return "Field {} can not be empty.".format(self.field)
+
+class DateTimeInvalidError(Error):
+    @property
+    def message(self):
+        return "Datetime is invalid."

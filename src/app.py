@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import os
+import datetime
 import hashlib, binascii
 
 import functools
@@ -117,13 +118,44 @@ def create_user():
 
 @app.route('/manage/assignment')
 @check_roles([role.ADMIN, role.TA])
-def show_assignments():
+def show_assignment_manage_list():
     adocs = assignment.Assignment.objects().all()
-    return render_template('assignment_manage_list', adocs=adocs)
+    return render_template('assignment_manage_list.html', adocs=adocs)
+
+@app.route('/manage/create/assignment', methods=['GET', 'POST'])
+@check_roles([role.ADMIN, role.TA])
+def create_assignment():
+    if request.method == 'GET':
+        return render_template('assignment_manage_create.html')
+    else:
+        name = request.form['name']
+        if not name:
+            return render_template('assignment_manage_create.html', error=error.FieldEmptyError('name'))
+
+        try:
+            begin_at = datetime.datetime.strptime(request.form['begin_at'], "%Y-%m-%dT%H:%M")
+            end_at = datetime.datetime.strptime(request.form['end_at'], "%Y-%m-%dT%H:%M")
+        except:
+            return render_template('assignment_manage_create.html', error=error.DateTimeInvalidError())
+
+        if begin_at > end_at:
+            return render_template('assignment_manage_create.html', error=error.DateTimeInvalidError())
+
+        visible = request.form['visible']
+        if visible == 'true':
+            visible = True
+        else:
+            visible = False
+
+        adoc = assignment.Assignment(name=name, begin_at=begin_at, end_at=end_at, visible=visible)
+        adoc.save()
+
+        return redirect(url_for('show_assignment_manage_list'))
 
 @app.route('/manage/assignment/<string:assignment_id>')
 @check_roles([role.ADMIN, role.TA])
 def manage_assignment(assignment_id):
-    return 'Manage Assignment'
+    adoc = assignment.Assignment.objects(id=ObjectId(assignment_id)).first()
+    return render_template('assignment_manage_detail.html', adoc=adoc)
 
 app.secret_key = os.urandom(24)
