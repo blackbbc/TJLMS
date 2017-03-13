@@ -3,6 +3,7 @@
 import os
 import datetime
 import hashlib, binascii
+import sys
 
 import functools
 
@@ -70,17 +71,30 @@ def show_assignment_list():
 @app.route('/assignment/<string:assignment_id>')
 def show_assignment_detail(assignment_id):
     adoc = assignment.Assignment.objects(id=ObjectId(assignment_id)).first()
-    return render_template('assignment_detail.html', adoc=adoc)
+    pdocs = problem.Problem.objects(assignment_id=assignment_id).order_by('+order').all()
+    return render_template('assignment_detail.html', adoc=adoc, pdocs=pdocs)
 
 @app.route('/assignment/<string:assignment_id>/<string:problem_id>', methods=['GET'])
 def show_problem(assignment_id, problem_id):
-    pdoc = problem.Problem.objects(id=ObjectId(problem_id))
-    return render_template('problem_detail', pdoc=pdoc)
+    pdoc = problem.Problem.objects(id=ObjectId(problem_id)).first()
+    return render_template('problem_detail.html', pdoc=pdoc)
 
 @app.route('/assignment/<string:assignment_id>/<string:problem_id>', methods=['POST'])
 @check_roles([role.ADMIN, role.STUDENT, role.ADMIN])
 def submit_problem(assignment_id, problem_id):
-    return "Submit Problem"
+    user_id = session['id']
+    atexts = request.form.getlist('atext')
+    qids = request.form.getlist('qid')
+    adocs = []
+    for atext, qid in zip(atexts, qids):
+        adoc = answer.Answer()
+        adoc = answer.Answer(question_id=qid, text=atext)
+        adocs.append(adoc)
+    sdoc = submission.Submission(user_id=user_id, assignment_id=assignment_id, problem_id=problem_id, answers=adocs)
+    shdoc = submission_history.SubmissionHistory(user_id=user_id, assignment_id=assignment_id, problem_id=problem_id, answers=adocs)
+    sdoc.save()
+    shdoc.save()
+    return redirect(url_for('show_assignment_detail', assignment_id=assignment_id))
 
 @app.route('/manage/user')
 @check_roles([role.ADMIN])
@@ -152,10 +166,45 @@ def create_assignment():
 
         return redirect(url_for('show_assignment_manage_list'))
 
+def sort_submission(x, y):
+    if x['problem']['order'] == y['problem']['order'] and x['user']['id'] == y['user']['id']:
+        return 0
+    if x['problem']['order'] < y['problem']['order'] \
+            or x['problem']['order'] == y['problem']['order'] and x['user']['id'] < y['user']['id']:
+                return -1
+    else:
+        return 1
+
 @app.route('/manage/assignment/<string:assignment_id>')
 @check_roles([role.ADMIN, role.TA])
 def manage_assignment(assignment_id):
-    adoc = assignment.Assignment.objects(id=ObjectId(assignment_id)).first()
-    return render_template('assignment_manage_detail.html', adoc=adoc)
+    sdocs = submission.Submission.objects(assignment_id=assignment_id).all()
+    ssdocs = []
+
+    for index in range(0, len(sdocs)):
+        sdoc = {}
+        sdoc['user'] = user.User.objects(id=sdocs[index]['user_id']).first()
+        sdoc['problem'] = problem.Problem.objects(id=sdocs[index]['problem_id']).first()
+        sdoc['answers'] = sdocs[index]['answers']
+        ssdocs.append(sdoc)
+
+    ssdocs.sort(key=functools.cmp_to_key(sort_submission))
+
+    return render_template('assignment_manage_detail.html', sdocs=ssdocs)
+
+@app.route('/manage/create/problem/<string:assignment_id>', methods=['GET', 'POST'])
+@check_roles([role.ADMIN, role.TA])
+def create_problem(assignment_id):
+    if request.method == 'GET':
+        return render_template('problem_create.html')
+    else:
+        qtexts = request.form.getlist('qtext')
+        qdocs = []
+        for qtext in qtexts:
+            qdoc = question.Question(text=qtext)
+            qdocs.append(qdoc)
+        pdoc = problem.Problem(order=int(request.form['order']), assignment_id=ObjectId(assignment_id), text=request.form['ptext'], questions=qdocs)
+        pdoc.save()
+        return redirect(url_for('show_assignment_list'))
 
 app.secret_key = os.urandom(24)

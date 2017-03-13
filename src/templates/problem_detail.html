@@ -1,0 +1,20 @@
+<html>
+  <head>
+    <meta charset="utf-8" />
+  </head>
+  <body>
+    {{pdoc.to_json()}}
+    <form method="POST">
+      {% for qdoc in pdoc['questions'] %}
+        <div>
+          {{qdoc.to_json()}}
+        </div>
+        <input type="hidden" name="qid" value="{{qdoc['_id']}}" >
+        <textarea name="atext"></textarea>
+      {% endfor %}
+      <div>
+        <input type="submit" name="submit" value="Submit" >
+      </div>
+    </form>
+  </body>
+</html>

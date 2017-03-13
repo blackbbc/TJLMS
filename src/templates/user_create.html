@@ -5,10 +5,10 @@
   <body>
     <form method="post">
       <div>
-        <label for="username">Username</label> : <input id="username" type="text" name="username" />
+        <label for="username">Username</label> : <input id="username" type="text" name="username" >
       </div>
       <div>
-        <label for="password">Password</label> : <input id="password" type="password" name="password" />
+        <label for="password">Password</label> : <input id="password" type="password" name="password" >
       </div>
       <div>
         <label>role : </label>
@@ -18,7 +18,7 @@
           <option value="admin">Admin</option>
         </select>
       </div>
-      <input type="submit" value="Create" />
+      <input type="submit" value="Create" >
     </form>
     {% if error %}
       <div>{{error.message}}</div>

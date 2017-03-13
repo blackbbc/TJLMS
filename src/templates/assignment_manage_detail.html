@@ -3,6 +3,12 @@
     <meta charset="utf-8" />
   </head>
   <body>
-    {{adoc.to_json}}
+    <ul>
+    {% for sdoc in sdocs %}
+      <li>
+      {{sdoc}}
+      </li>
+    {% endfor %}
+    </ul>
   </body>
 </html>
