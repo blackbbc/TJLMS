@@ -8,7 +8,8 @@
 - [sudo] pip install -r requirements.txt
 
 ## Run
-Make sure launch mongodb
+Make sure launch `MongoDB`
+
 Run command
 ```bash
 cd src
