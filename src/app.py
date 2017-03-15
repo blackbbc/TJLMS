@@ -8,7 +8,7 @@ import sys
 import functools
 
 from werkzeug.contrib.fixers import ProxyFix
-from flask import Flask, session, request, render_template, redirect, url_for, escape
+from flask import Flask, session, request, render_template, redirect, url_for, escape, jsonify
 
 from bson.objectid import ObjectId
 
@@ -37,6 +37,18 @@ def check_roles(roles=[role.ADMIN, role.TA, role.STUDENT]):
                 return func(*args, **kwargs)
             else:
                 return redirect(url_for('login'))
+        return wrapper
+    return decorator
+
+def require(*required_args):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            for arg in required_args:
+                if arg not in request.json:
+                    return jsonify(code=400, msg='参数不正确')
+                return func(*args, **kwargs)
+            pass
         return wrapper
     return decorator
 
