@@ -9,3 +9,11 @@ class Answer(EmbeddedDocument):
     question_id = ObjectIdField()
     text = StringField()
     score = IntField(default = 0)
+
+    def to_json(self):
+        return {
+            'id': str(self['id']),
+            'question_id': str(self['question_id']),
+            'text': self['text'],
+            'score': self['score']
+        }
