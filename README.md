@@ -10,10 +10,18 @@
 ## Run
 Make sure launch `MongoDB`
 
-Run command
+Run commands
 ```bash
 cd src
 export FLASK_APP=app.py
 export FLASK_DEBUG=1
 flask run
 ```
+
+Add admin account
+```bash
+cd src
+python -m test.add_admin
+```
+
+Now login with `admin:admin`
