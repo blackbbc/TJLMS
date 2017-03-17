@@ -33,13 +33,8 @@ def check_roles(roles=[role.ADMIN, role.TA, role.STUDENT]):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            token = request.cookies.get('token')
-            if token:
-                udoc = user.User.verify_auth_token(token, app.secret_key)
-                if udoc and udoc['role'] in roles:
-                    return func(udoc, *args, **kwargs)
-                else:
-                    return jsonify(code=401, msg='Require roles.')
+            if 'role' in session and session['role'] in roles:
+                return func(*args, **kwargs)
             else:
                 return jsonify(code=401, msg='Require roles.')
         return wrapper
@@ -64,15 +59,17 @@ def login():
 
     udoc = user.User.objects(username=username).first()
     if udoc and hash(password, udoc['salt']) == udoc['password_hash']:
-        token = udoc.generate_auth_token(app.secret_key)
-        return jsonify(code=200, data=token)
+        session['id'] = str(udoc['id'])
+        session['role'] = udoc['role']
+        return jsonify(code=200)
     else:
         return jsonify(code=410, msg='Invalid username or password')
 
 @app.route('/user/logout')
 def logout():
-    token = user.User.invalidate()
-    return jsonify(code=200, data=token)
+    session.pop('id', None)
+    session.pop('role', None)
+    return jsonify(code=200)
 
 @app.route('/assignment')
 def show_assignment_list():
@@ -109,22 +106,22 @@ def show_problem(assignment_id, problem_id):
 
 @app.route('/assignment/<string:assignment_id>/<string:problem_id>', methods=['POST'])
 @require('answers')
-@check_roles([role.ADMIN, role.STUDENT, role.ADMIN])
-def submit_problem(udoc, assignment_id, problem_id):
+@check_roles([role.ADMIN, role.STUDENT, role.TA])
+def submit_problem(assignment_id, problem_id):
     answers = request.json['answers']
     adocs = []
     for adoc in answers:
         adoc = answer.Answer(question_id=adoc['question_id'], text=adoc['text'])
         adocs.append(adoc)
-    sdoc = submission.Submission(user_id=udoc['id'], assignment_id=assignment_id, problem_id=problem_id, answers=adocs)
-    shdoc = submission_history.SubmissionHistory(user_id=udoc['id'], assignment_id=assignment_id, problem_id=problem_id, answers=adocs)
+    sdoc = submission.Submission(user_id=ObjectId(session['id']), assignment_id=assignment_id, problem_id=problem_id, answers=adocs)
+    shdoc = submission_history.SubmissionHistory(user_id=ObjectId(session['id']), assignment_id=assignment_id, problem_id=problem_id, answers=adocs)
     sdoc.save()
     shdoc.save()
     return jsonify(code=200)
 
 @app.route('/manage/user')
 @check_roles([role.ADMIN])
-def show_users(udoc):
+def show_users():
     udocs = user.User.objects().all()
     udocs = [udoc.to_json() for udoc in udocs]
     return jsonify(code=200, data=udocs)
@@ -132,7 +129,7 @@ def show_users(udoc):
 @app.route('/manage/user/create', methods=['POST'])
 @require('username', 'password', 'role')
 @check_roles([role.ADMIN])
-def create_user(udoc):
+def create_user():
     username = request.json['username']
     password = request.json['password']
     role = request.json['role']
@@ -156,7 +153,7 @@ def create_user(udoc):
 
 @app.route('/manage/assignment')
 @check_roles([role.ADMIN, role.TA])
-def show_assignment_manage_list(udoc):
+def show_assignment_manage_list():
     adocs = assignment.Assignment.objects().all()
     adocs = [adoc.to_json() for adoc in adocs]
     return jsonify(code=200, data=adocs)
@@ -164,7 +161,7 @@ def show_assignment_manage_list(udoc):
 @app.route('/manage/create/assignment', methods=['POST'])
 @require('name', 'begin_at', 'end_at', 'visible')
 @check_roles([role.ADMIN, role.TA])
-def create_assignment(udoc):
+def create_assignment():
         name = request.json['name']
         if not name:
             return jsonify(code=402, msg='Name cannot be empty.')
@@ -196,7 +193,7 @@ def sort_submission(x, y):
 
 @app.route('/manage/assignment/<string:assignment_id>')
 @check_roles([role.ADMIN, role.TA])
-def manage_assignment(udoc, assignment_id):
+def manage_assignment(assignment_id):
     sdocs = submission.Submission.objects(assignment_id=assignment_id).all()
     ssdocs = []
 
@@ -213,8 +210,8 @@ def manage_assignment(udoc, assignment_id):
 @app.route('/manage/create/problem/<string:assignment_id>', methods=['POST'])
 @require('order', 'ptext', 'qtexts')
 @check_roles([role.ADMIN, role.TA])
-def create_problem(udoc, assignment_id):
-    qtexts = request.json('qtexts')
+def create_problem(assignment_id):
+    qtexts = request.json['qtexts']
     qdocs = []
     for qtext in qtexts:
         qdoc = question.Question(text=qtext)
