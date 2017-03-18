@@ -71,6 +71,12 @@ def logout():
     session.pop('role', None)
     return jsonify(code=200)
 
+@app.route('/user/status')
+@check_roles()
+def status():
+    udoc = user.User.objects(id=ObjectId(session['id'])).first().to_json()
+    return jsonify(code=200, data=udoc)
+
 @app.route('/assignment')
 def show_assignment_list():
     adocs = assignment.Assignment.objects(visible=True).all()
@@ -106,7 +112,7 @@ def show_problem(assignment_id, problem_id):
 
 @app.route('/assignment/<string:assignment_id>/<string:problem_id>', methods=['POST'])
 @require('answers')
-@check_roles([role.ADMIN, role.STUDENT, role.TA])
+@check_roles()
 def submit_problem(assignment_id, problem_id):
     answers = request.json['answers']
     adocs = []
