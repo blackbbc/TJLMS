@@ -56,6 +56,7 @@ def login():
 
     udoc = user.User.objects(username=username).first()
     if udoc and hash(password, udoc['salt']) == udoc['password_hash']:
+        session.permanent = True
         session['id'] = str(udoc['id'])
         session['role'] = udoc['role']
         return jsonify(code=200)
@@ -221,7 +222,33 @@ def create_problem(assignment_id):
         qdocs.append(qdoc)
     pdoc = problem.Problem(order=int(request.json['order']), assignment_id=ObjectId(assignment_id), text=request.json['ptext'], questions=qdocs)
     pdoc.save()
-    return jsonify(code=200)
+    return jsonify(code=200, data=pdoc.to_json())
+
+@bp.route('/manage/update/problem/<string:problem_id>/content', methods=['POST'])
+@require('ptext', 'qtexts')
+@check_roles([role.ADMIN, role.TA])
+def update_problem_content(problem_id):
+    qtexts = request.json['qtexts']
+    qdocs = []
+    for qtext in qtexts:
+        qdoc = question.Question(text=qtext)
+        qdocs.append(qdoc)
+    pdoc = problem.Problem.objects(id=ObjectId(problem_id)).first()
+    pdoc['text'] = request.json['ptext']
+    pdoc['questions'] = qdocs
+    pdoc.save()
+    return jsonify(code=200, data=pdoc.to_json())
+
+@bp.route('/manage/update/problem/<string:problem_id>/meta', methods=['POST'])
+@require('assignment_id', 'order', 'visible')
+@check_roles([role.ADMIN, role.TA])
+def update_problem_meta(problem_id):
+    pdoc = problem.Problem.objects(id=ObjectId(problem_id)).first()
+    pdoc['order'] = request.json['order']
+    pdoc['visible'] = request.json['visible']
+    pdoc['assignment_id'] = ObjectId(request.json['assignment_id'])
+    pdoc.save()
+    return jsonify(code=200, data=pdoc.to_json())
 
 @bp.route('/grade/<string:submission_id>', methods=['POST'])
 @require('grades')

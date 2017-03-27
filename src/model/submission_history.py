@@ -3,8 +3,9 @@
 from mongoengine import *
 
 from model import answer
+from model import basedoc
 
-class SubmissionHistory(Document):
+class SubmissionHistory(basedoc.JsonDocument, Document):
     user_id = ObjectIdField()
     assignment_id = ObjectIdField()
     problem_id = ObjectIdField()
