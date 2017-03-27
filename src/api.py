@@ -72,13 +72,12 @@ def logout():
 @bp.route('/user/status')
 @check_roles()
 def status():
-    udoc = user.User.objects(id=ObjectId(session['id'])).first().to_json()
+    udoc = user.User.objects(id=ObjectId(session['id'])).first()
     return jsonify(code=200, data=udoc)
 
 @bp.route('/assignment')
 def show_assignment_list():
     adocs = assignment.Assignment.objects(visible=True).all()
-    adocs = [adoc.to_json() for adoc in adocs]
     return jsonify(code=200, data=adocs)
 
 @bp.route('/assignment/<string:assignment_id>')
@@ -88,8 +87,8 @@ def show_assignment_detail(assignment_id):
         if adoc:
             pdocs = problem.Problem.objects(assignment_id=assignment_id).order_by('+order').all()
 
-            data = adoc.to_json()
-            data['problems'] = [pdoc.to_json() for pdoc in pdocs]
+            data = adoc.to_mongo()
+            data['problems'] = pdocs
 
             return jsonify(code=200, data=data)
         else:
@@ -102,7 +101,7 @@ def show_problem(assignment_id, problem_id):
     try:
         pdoc = problem.Problem.objects(id=ObjectId(problem_id)).first()
         if pdoc:
-            return jsonify(code=200, data=pdoc.to_json())
+            return jsonify(code=200, data=pdoc)
         else:
             return jsonify(code=200, data=None)
     except:
@@ -127,7 +126,6 @@ def submit_problem(assignment_id, problem_id):
 @check_roles([role.ADMIN])
 def show_users():
     udocs = user.User.objects().all()
-    udocs = [udoc.to_json() for udoc in udocs]
     return jsonify(code=200, data=udocs)
 
 @bp.route('/manage/user/create', methods=['POST'])
@@ -159,7 +157,6 @@ def create_user():
 @check_roles([role.ADMIN, role.TA])
 def show_assignment_manage_list():
     adocs = assignment.Assignment.objects().all()
-    adocs = [adoc.to_json() for adoc in adocs]
     return jsonify(code=200, data=adocs)
 
 @bp.route('/manage/create/assignment', methods=['POST'])
@@ -171,13 +168,13 @@ def create_assignment():
             return jsonify(code=402, msg='Name cannot be empty.')
 
         try:
-            begin_at = datetime.datetime.strptime(request.json['begin_at'], "%Y-%m-%dT%H:%M:%S")
-            end_at = datetime.datetime.strptime(request.json['end_at'], "%Y-%m-%dT%H:%M:%S")
+            begin_at = datetime.datetime.fromtimestamp(request.json['begin_at'])
+            end_at = datetime.datetime.fromtimestamp(request.json['end_at'])
         except:
             return jsonify(code=403, msg='Invalid datetime.')
 
         if begin_at > end_at:
-            return jsonify(code=403, msg='Invalid datetime.')
+            return jsonify(code=403, msg='Invalid datetime, begin_at should be less than end_at.')
 
         visible = request.json['visible']
 
@@ -203,8 +200,8 @@ def manage_assignment(assignment_id):
 
     for index in range(0, len(sdocs)):
         sdoc = {}
-        sdoc['user'] = user.User.objects(id=sdocs[index]['user_id']).first().to_json()
-        sdoc['problem'] = problem.Problem.objects(id=sdocs[index]['problem_id']).first().to_json()
+        sdoc['user'] = user.User.objects(id=sdocs[index]['user_id']).first()
+        sdoc['problem'] = problem.Problem.objects(id=sdocs[index]['problem_id']).first()
         ssdocs.append(sdoc)
 
     ssdocs.sort(key=functools.cmp_to_key(sort_submission))
@@ -222,7 +219,7 @@ def create_problem(assignment_id):
         qdocs.append(qdoc)
     pdoc = problem.Problem(order=int(request.json['order']), assignment_id=ObjectId(assignment_id), text=request.json['ptext'], questions=qdocs)
     pdoc.save()
-    return jsonify(code=200, data=pdoc.to_json())
+    return jsonify(code=200, data=pdoc)
 
 @bp.route('/manage/update/problem/<string:problem_id>/content', methods=['POST'])
 @require('ptext', 'qtexts')
@@ -237,7 +234,7 @@ def update_problem_content(problem_id):
     pdoc['text'] = request.json['ptext']
     pdoc['questions'] = qdocs
     pdoc.save()
-    return jsonify(code=200, data=pdoc.to_json())
+    return jsonify(code=200, data=pdoc)
 
 @bp.route('/manage/update/problem/<string:problem_id>/meta', methods=['POST'])
 @require('assignment_id', 'order', 'visible')
@@ -248,7 +245,7 @@ def update_problem_meta(problem_id):
     pdoc['visible'] = request.json['visible']
     pdoc['assignment_id'] = ObjectId(request.json['assignment_id'])
     pdoc.save()
-    return jsonify(code=200, data=pdoc.to_json())
+    return jsonify(code=200, data=pdoc)
 
 @bp.route('/grade/<string:submission_id>', methods=['POST'])
 @require('grades')

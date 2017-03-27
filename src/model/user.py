@@ -6,20 +6,13 @@ from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
 from itsdangerous import SignatureExpired
 
 class User(Document):
+    _serializable_fields = ['username', 'role', 'student_number', 'realname']
     username = StringField()
     password_hash = StringField()
     salt = BinaryField()
     role = StringField()
     student_number = IntField()
     realname = StringField()
-
-    def to_json(self):
-        return {
-            'username': self['username'],
-            'role': self['role'],
-            'student_number': self['student_number'],
-            'realname': self['realname']
-        }
 
     # def generate_auth_token(self, secret_key, expiration = 600):
     #     s = Serializer(secret_key, expires_in = expiration)
