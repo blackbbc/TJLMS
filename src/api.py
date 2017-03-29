@@ -85,7 +85,7 @@ def show_assignment_detail(assignment_id):
     try:
         adoc = assignment.Assignment.objects(id=ObjectId(assignment_id)).first()
         if adoc:
-            pdocs = problem.Problem.objects(assignment_id=assignment_id).order_by('+order').all()
+            pdocs = problem.Problem.objects(assignment_id=assignment_id, visible=True).order_by('+order').all()
 
             data = adoc.to_mongo()
             data['problems'] = pdocs
@@ -101,6 +101,9 @@ def show_problem(assignment_id, problem_id):
     try:
         pdoc = problem.Problem.objects(id=ObjectId(problem_id)).first()
         if pdoc:
+            pdoc = pdoc.to_mongo()
+            sdoc = submission.Submission.objects(user_id=ObjectId(session['id']), assignment_id=assignment_id, problem_id=problem_id).first()
+            pdoc['submission'] = sdoc
             return jsonify(code=200, data=pdoc)
         else:
             return jsonify(code=200, data=None)
@@ -116,11 +119,18 @@ def submit_problem(assignment_id, problem_id):
     for adoc in answers:
         adoc = answer.Answer(question_id=adoc['question_id'], text=adoc['text'])
         adocs.append(adoc)
-    sdoc = submission.Submission(user_id=ObjectId(session['id']), assignment_id=assignment_id, problem_id=problem_id, answers=adocs)
-    shdoc = submission_history.SubmissionHistory(user_id=ObjectId(session['id']), assignment_id=assignment_id, problem_id=problem_id, answers=adocs)
+
+    sdoc = submission.Submission.objects(user_id=ObjectId(session['id']), assignment_id=assignment_id, problem_id=problem_id).first()
+    if not sdoc:
+        sdoc = submission.Submission(user_id=ObjectId(session['id']), assignment_id=assignment_id, problem_id=problem_id)
+
+    sdoc['answers'] = adocs
     sdoc.save()
+
+    shdoc = submission_history.SubmissionHistory(user_id=ObjectId(session['id']), assignment_id=assignment_id, problem_id=problem_id, answers=adocs)
     shdoc.save()
-    return jsonify(code=200)
+
+    return jsonify(code=200, data=sdoc)
 
 @bp.route('/manage/user')
 @check_roles([role.ADMIN])
@@ -194,7 +204,16 @@ def sort_submission(x, y):
 
 @bp.route('/manage/assignment/<string:assignment_id>')
 @check_roles([role.ADMIN, role.TA])
-def manage_assignment(assignment_id):
+def manage_get_assignment(assignment_id):
+    adoc = assignment.Assignment.objects(id=ObjectId(assignment_id)).first()
+    if adoc:
+        adoc = adoc.to_mongo()
+        adoc['problems'] = problem.Problem.objects(assignment_id=assignment_id).order_by('+order').all()
+    return jsonify(code=200, data=adoc)
+
+@bp.route('/manage/assignment/submission/<string:assignment_id>')
+@check_roles([role.ADMIN, role.TA])
+def manage_get_assignment_submissions(assignment_id):
     sdocs = submission.Submission.objects(assignment_id=assignment_id).all()
     ssdocs = []
 
@@ -209,7 +228,7 @@ def manage_assignment(assignment_id):
     return jsonify(code=200, data=ssdocs)
 
 @bp.route('/manage/create/problem/<string:assignment_id>', methods=['POST'])
-@require('order', 'ptext', 'qtexts')
+@require('order', 'ptext', 'qtexts', 'visible')
 @check_roles([role.ADMIN, role.TA])
 def create_problem(assignment_id):
     qtexts = request.json['qtexts']
@@ -217,7 +236,12 @@ def create_problem(assignment_id):
     for qtext in qtexts:
         qdoc = question.Question(text=qtext)
         qdocs.append(qdoc)
-    pdoc = problem.Problem(order=int(request.json['order']), assignment_id=ObjectId(assignment_id), text=request.json['ptext'], questions=qdocs)
+    pdoc = problem.Problem(
+        order=int(request.json['order']),
+        assignment_id=ObjectId(assignment_id),
+        text=request.json['ptext'],
+        questions=qdocs,
+        visible=request.json['visible'])
     pdoc.save()
     return jsonify(code=200, data=pdoc)
 
