@@ -9,3 +9,4 @@ class SubmissionHistory(Document):
     assignment_id = ObjectIdField()
     problem_id = ObjectIdField()
     answers = ListField(EmbeddedDocumentField(answer.Answer))
+    submit_at = DateTimeField()

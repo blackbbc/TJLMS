@@ -61,7 +61,7 @@ def login():
         session['role'] = udoc['role']
         return jsonify(code=200)
     else:
-        return jsonify(code=410, msg='Invalid username or password')
+        return jsonify(code=401, msg='Invalid username or password')
 
 @bp.route('/user/logout')
 def logout():
@@ -97,40 +97,65 @@ def show_assignment_detail(assignment_id):
 
 @bp.route('/assignment/<string:assignment_id>/<string:problem_id>')
 def show_problem(assignment_id, problem_id):
-    try:
-        pdoc = problem.Problem.objects(
-            id=ObjectId(problem_id),
-            visible=True).first()
-        if pdoc:
-            pdoc = pdoc.to_mongo()
-            pdoc['submission'] = submission.Submission.objects(
-                user_id=ObjectId(session['id']),
-                assignment_id=assignment_id,
-                problem_id=problem_id).first()
-            return jsonify(code=200, data=pdoc)
-        else:
-            return jsonify(code=200, data=None)
-    except:
-        return jsonify(code=200, data=None)
+    pdoc = problem.Problem.objects(
+        id=ObjectId(problem_id),
+        visible=True).first()
+    if pdoc:
+        pdoc = pdoc.to_mongo()
+        pdoc['submission'] = submission.Submission.objects(
+            user_id=ObjectId(session['id']),
+            assignment_id=assignment_id,
+            problem_id=problem_id).first()
+    return jsonify(code=200, data=pdoc)
 
 @bp.route('/assignment/<string:assignment_id>/<string:problem_id>', methods=['POST'])
 @require('answers')
 @check_roles()
 def submit_problem(assignment_id, problem_id):
+    # verify assignment and problem
+    adoc = assignment.Assignment.objects(
+        id=ObjectId(assignment_id),
+        visible=True).first()
+    if not adoc:
+        return jsonify(code=403, reason='Invalid assignment')
+    pdoc = problem.Problem.objects(
+        id=ObjectId(problem_id),
+        visible=True).first()
+    if not pdoc:
+        return jsonify(code=403, reason='Invalid problem')
+
+    # verify begin_at, end_at
+    now = datetime.datetime.now()
+    if now < adoc.begin_at
+        return jsonify(code=403, reason='Assignment is not open')
+    if now > adoc.end_at
+        return jsonify(code=403, reason='Assignment is closed')
+
     answers = request.json['answers']
-    adocs = []
-    for adoc in answers:
-        adoc = answer.Answer(question_id=adoc['question_id'], text=adoc['text'])
-        adocs.append(adoc)
+    adocs = [answer.Answer(
+        question_id=adoc['question_id'],
+        text=adoc['text']) for adoc in answers]
 
-    sdoc = submission.Submission.objects(user_id=ObjectId(session['id']), assignment_id=assignment_id, problem_id=problem_id).first()
+    sdoc = submission.Submission.objects(
+        user_id=ObjectId(session['id']),
+        assignment_id=assignment_id,
+        problem_id=problem_id).first()
     if not sdoc:
-        sdoc = submission.Submission(user_id=ObjectId(session['id']), assignment_id=assignment_id, problem_id=problem_id)
-
+        sdoc = submission.Submission(
+            user_id=ObjectId(session['id']),
+            assignment_id=assignment_id,
+            problem_id=problem_id,
+            created_at=now)
+    sdoc['update_at'] = now
     sdoc['answers'] = adocs
     sdoc.save()
 
-    shdoc = submission_history.SubmissionHistory(user_id=ObjectId(session['id']), assignment_id=assignment_id, problem_id=problem_id, answers=adocs)
+    shdoc = submission_history.SubmissionHistory(
+        submit_at=now,
+        user_id=ObjectId(session['id']),
+        assignment_id=assignment_id,
+        problem_id=problem_id,
+        answers=adocs)
     shdoc.save()
 
     return jsonify(code=200, data=sdoc)
@@ -176,25 +201,27 @@ def show_assignment_manage_list():
 @require('name', 'begin_at', 'end_at', 'visible')
 @check_roles([role.ADMIN, role.TA])
 def create_assignment():
-        name = request.json['name']
-        if not name:
-            return jsonify(code=402, msg='Name cannot be empty.')
+    name = request.json['name']
+    if not name:
+        return jsonify(code=402, msg='Name cannot be empty.')
 
-        try:
-            begin_at = datetime.datetime.fromtimestamp(request.json['begin_at'] / 1000.0)
-            end_at = datetime.datetime.fromtimestamp(request.json['end_at'] / 1000.0)
-        except:
-            return jsonify(code=403, msg='Invalid datetime.')
+    try:
+        begin_at = datetime.datetime.fromtimestamp(request.json['begin_at'] / 1000.0)
+        end_at = datetime.datetime.fromtimestamp(request.json['end_at'] / 1000.0)
+    except:
+        return jsonify(code=403, msg='Invalid datetime.')
 
-        if begin_at > end_at:
-            return jsonify(code=403, msg='Invalid datetime, begin_at should be less than end_at.')
+    if begin_at > end_at:
+        return jsonify(code=403, msg='Invalid datetime, begin_at should be less than end_at.')
 
-        visible = request.json['visible']
+    adoc = assignment.Assignment(
+        name=name,
+        begin_at=begin_at,
+        end_at=end_at,
+        visible=request.json['visible'])
+    adoc.save()
 
-        adoc = assignment.Assignment(name=name, begin_at=begin_at, end_at=end_at, visible=visible)
-        adoc.save()
-
-        return jsonify(code=200)
+    return jsonify(code=200)
 
 def sort_submission(x, y):
     if x['problem']['order'] == y['problem']['order'] and x['user']['id'] == y['user']['id']:
@@ -211,7 +238,8 @@ def manage_get_assignment(assignment_id):
     adoc = assignment.Assignment.objects(id=ObjectId(assignment_id)).first()
     if adoc:
         adoc = adoc.to_mongo()
-        adoc['problems'] = problem.Problem.objects(assignment_id=assignment_id).order_by('+order').all()
+        adoc['problems'] = problem.Problem.objects(
+            assignment_id=assignment_id).order_by('+order').all()
     return jsonify(code=200, data=adoc)
 
 @bp.route('/manage/assignment/submission/<string:assignment_id>')
