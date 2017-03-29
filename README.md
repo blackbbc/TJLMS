@@ -11,6 +11,7 @@
 Make sure launch `MongoDB`
 
 Run commands
+
 ```bash
 cd src
 export FLASK_APP=app.py
@@ -19,9 +20,17 @@ flask run
 ```
 
 Add admin account
+
 ```bash
 cd src
 python -m test.add_admin
 ```
 
 Now login with `admin:admin`
+
+Add student account
+
+```bash
+cd src
+python -m test.add_student
+```
