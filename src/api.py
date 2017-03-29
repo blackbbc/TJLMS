@@ -82,28 +82,31 @@ def show_assignment_list():
 
 @bp.route('/assignment/<string:assignment_id>')
 def show_assignment_detail(assignment_id):
-    try:
-        adoc = assignment.Assignment.objects(id=ObjectId(assignment_id)).first()
-        if adoc:
-            pdocs = problem.Problem.objects(assignment_id=assignment_id, visible=True).order_by('+order').all()
-
-            data = adoc.to_mongo()
-            data['problems'] = pdocs
-
-            return jsonify(code=200, data=data)
-        else:
-            return jsonify(code=200, data=None)
-    except:
-        return jsonify(code=200, data=None)
+    adoc = assignment.Assignment.objects(
+        id=ObjectId(assignment_id),
+        visible=True).first()
+    if adoc:
+        adoc = adoc.to_mongo()
+        adoc['problems'] = problem.Problem.objects(
+            assignment_id=assignment_id,
+            visible=True).order_by('+order').all()
+        adoc['submissions'] = submission.Submission.objects(
+            user_id=ObjectId(session['id']),
+            assignment_id=assignment_id).first()
+    return jsonify(code=200, data=adoc)
 
 @bp.route('/assignment/<string:assignment_id>/<string:problem_id>')
 def show_problem(assignment_id, problem_id):
     try:
-        pdoc = problem.Problem.objects(id=ObjectId(problem_id)).first()
+        pdoc = problem.Problem.objects(
+            id=ObjectId(problem_id),
+            visible=True).first()
         if pdoc:
             pdoc = pdoc.to_mongo()
-            sdoc = submission.Submission.objects(user_id=ObjectId(session['id']), assignment_id=assignment_id, problem_id=problem_id).first()
-            pdoc['submission'] = sdoc
+            pdoc['submission'] = submission.Submission.objects(
+                user_id=ObjectId(session['id']),
+                assignment_id=assignment_id,
+                problem_id=problem_id).first()
             return jsonify(code=200, data=pdoc)
         else:
             return jsonify(code=200, data=None)
