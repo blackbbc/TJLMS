@@ -10,3 +10,5 @@ class Submission(Document):
     problem_id = ObjectIdField()
     answers = ListField(EmbeddedDocumentField(answer.Answer))
     acc_score = IntField(default = 0)
+    created_at = DateTimeField()
+    updated_at = DateTimeField()
