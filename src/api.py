@@ -92,7 +92,7 @@ def show_assignment_detail(assignment_id):
             visible=True).order_by('+order').all()
         adoc['submissions'] = submission.Submission.objects(
             user_id=ObjectId(session['id']),
-            assignment_id=assignment_id).first()
+            assignment_id=assignment_id).all()
     return jsonify(code=200, data=adoc)
 
 @bp.route('/assignment/<string:assignment_id>/<string:problem_id>')
