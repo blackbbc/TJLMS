@@ -126,9 +126,9 @@ def submit_problem(assignment_id, problem_id):
 
     # verify begin_at, end_at
     now = datetime.datetime.now()
-    if now < adoc.begin_at
+    if now < adoc.begin_at:
         return jsonify(code=403, reason='Assignment is not open')
-    if now > adoc.end_at
+    if now > adoc.end_at:
         return jsonify(code=403, reason='Assignment is closed')
 
     answers = request.json['answers']
