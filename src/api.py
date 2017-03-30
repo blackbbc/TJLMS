@@ -146,7 +146,7 @@ def submit_problem(assignment_id, problem_id):
             assignment_id=assignment_id,
             problem_id=problem_id,
             created_at=now)
-    sdoc['update_at'] = now
+    sdoc['updated_at'] = now
     sdoc['answers'] = adocs
     sdoc.save()
 
