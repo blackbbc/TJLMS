@@ -206,8 +206,8 @@ def create_assignment():
         return jsonify(code=402, msg='Name cannot be empty.')
 
     try:
-        begin_at = datetime.datetime.fromtimestamp(request.json['begin_at'] / 1000.0)
-        end_at = datetime.datetime.fromtimestamp(request.json['end_at'] / 1000.0)
+        begin_at = datetime.datetime.fromtimestamp(request.json['begin_at'] / 1000)
+        end_at = datetime.datetime.fromtimestamp(request.json['end_at'] / 1000)
     except:
         return jsonify(code=403, msg='Invalid datetime.')
 
