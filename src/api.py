@@ -191,6 +191,18 @@ def create_user():
 
     return jsonify(code=200)
 
+@bp.route('/manage/user/update', methods=['POST'])
+@require('password')
+@check_roles()
+def update_user():
+    if not password:
+        return jsonify(code=402, msg='Password cannot be empty.')
+
+    udoc = user.User.objects(id=ObjectId(session['id'])).first()
+    udoc.save()
+
+    return jsonify(code=200)
+
 @bp.route('/manage/assignment')
 @check_roles([role.ADMIN, role.TA])
 def show_assignment_manage_list():
