@@ -195,10 +195,16 @@ def create_user():
 @require('password')
 @check_roles()
 def update_user():
+    password = request.json['password']
     if not password:
         return jsonify(code=402, msg='Password cannot be empty.')
 
     udoc = user.User.objects(id=ObjectId(session['id'])).first()
+
+    salt = os.urandom(16)
+    password_hash = hash(password, salt)
+    udoc['salt'] = salt
+    udoc['password_hash'] = password_hash
     udoc.save()
 
     return jsonify(code=200)
