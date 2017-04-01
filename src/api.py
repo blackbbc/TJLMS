@@ -186,7 +186,7 @@ def create_user():
     if udoc:
         return jsonify(code=411, msg='User already exist.')
 
-    udoc = user.User(username=username, password_hash=password_hash, salt=salt, role=role)
+    udoc = user.User(username=username, password_hash=password_hash, salt=salt, role=role, first=True)
     udoc.save()
 
     return jsonify(code=200)
@@ -205,6 +205,7 @@ def update_user():
     password_hash = hash(password, salt)
     udoc['salt'] = salt
     udoc['password_hash'] = password_hash
+    udoc['first'] = False
     udoc.save()
 
     return jsonify(code=200)
