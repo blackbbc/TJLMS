@@ -165,19 +165,13 @@ def submit_problem(assignment_id, problem_id):
         question_id=adoc['question_id'],
         text=adoc['text']) for adoc in answers]
 
-    sdoc = submission.Submission.objects(
-        user_id=ObjectId(session['id']),
-        assignment_id=assignment_id,
-        problem_id=problem_id).first()
-    if not sdoc:
-        sdoc = submission.Submission(
-            user_id=ObjectId(session['id']),
-            assignment_id=assignment_id,
-            problem_id=problem_id,
-            created_at=now)
-    sdoc['updated_at'] = now
-    sdoc['answers'] = adocs
-    sdoc.save()
+    sdoc = (submission.Submission
+        .objects(user_id=ObjectId(session['id']),
+                 assignment_id=assignment_id,
+                 problem_id=problem_id)
+        .upsert_one(set_on_insert__created_at=now,
+                    set__updated_at=now,
+                    set__answers=adocs))
 
     shdoc = submission_history.SubmissionHistory(
         submit_at=now,
