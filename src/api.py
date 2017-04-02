@@ -107,27 +107,6 @@ def show_assignment_detail(assignment_id):
 
     return jsonify(code=200, data=adoc)
 
-@bp.route('/assignment/history/list/<string:assignment_id>/<string:problem_id>')
-@check_roles()
-def show_submission_history_list(assignment_id, problem_id):
-    sbdocs = (submission_history.SubmissionHistory
-        .objects(user_id=ObjectId(session['id']),
-                 assignment_id=assignment_id,
-                 problem_id=problem_id)
-        .order_by('-submit_at')
-        .exclude('answers')
-        .all())
-    return jsonify(code=200, data=sbdocs)
-
-@bp.route('/assignment/history/detail/<string:history_id>')
-@check_roles()
-def show_submission_history_detail(history_id):
-    sbdoc = (submission_history.SubmissionHistory
-        .objects(id=history_id,
-                 user_id=ObjectId(session['id']))
-        .first())
-    return jsonify(code=200, data=sbdoc)
-
 @bp.route('/assignment/<string:assignment_id>/<string:problem_id>')
 @check_roles()
 def show_problem(assignment_id, problem_id):
@@ -200,6 +179,27 @@ def submit_problem(assignment_id, problem_id):
     shdoc.save()
 
     return jsonify(code=200, data=sdoc)
+
+@bp.route('/assignment/history/list/<string:assignment_id>/<string:problem_id>')
+@check_roles()
+def show_submission_history_list(assignment_id, problem_id):
+    sbdocs = (submission_history.SubmissionHistory
+        .objects(user_id=ObjectId(session['id']),
+                 assignment_id=assignment_id,
+                 problem_id=problem_id)
+        .order_by('-submit_at')
+        .exclude('answers')
+        .all())
+    return jsonify(code=200, data=sbdocs)
+
+@bp.route('/assignment/history/detail/<string:history_id>')
+@check_roles()
+def show_submission_history_detail(history_id):
+    sbdoc = (submission_history.SubmissionHistory
+        .objects(id=history_id,
+                 user_id=ObjectId(session['id']))
+        .first())
+    return jsonify(code=200, data=sbdoc)
 
 @bp.route('/manage/user')
 @check_roles([role.ADMIN])
