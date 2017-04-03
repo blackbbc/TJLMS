@@ -281,7 +281,36 @@ def create_assignment():
         visible=request.json['visible'])
     adoc.save()
 
-    return jsonify(code=200)
+    return jsonify(code=200, data=adoc)
+
+@bp.route('/manage/update/assignment/<string:assignment_id>', methods=['POST'])
+@require('name', 'begin_at', 'end_at', 'visible')
+@check_roles([role.ADMIN, role.TA])
+def update_assignment(assignment_id):
+    name = request.json['name']
+    if not name:
+        return jsonify(code=402, msg='Name cannot be empty.')
+
+    try:
+        begin_at = datetime.datetime.fromtimestamp(request.json['begin_at'] / 1000)
+        end_at = datetime.datetime.fromtimestamp(request.json['end_at'] / 1000)
+    except:
+        return jsonify(code=403, msg='Invalid datetime.')
+
+    if begin_at > end_at:
+        return jsonify(code=403, msg='Invalid datetime, begin_at should be less than end_at.')
+
+    adoc = assignment.Assignment.objects(id=ObjectId(assignment_id)).first()
+    if not adoc:
+        return jsonify(code=403, reason='Invalid assignment')
+
+    adoc['name'] = name
+    adoc['begin_at'] = begin_at
+    adoc['end_at'] = end_at
+    adoc['visible'] = request.json['visible']
+    adoc.save()
+
+    return jsonify(code=200, data=adoc)
 
 def sort_submission(x, y):
     if x['problem']['order'] == y['problem']['order'] and x['user']['id'] == y['user']['id']:
