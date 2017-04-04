@@ -33,7 +33,7 @@ def check_roles(roles=[role.ADMIN, role.TA, role.STUDENT]):
             if 'role' in session and session['role'] in roles:
                 return func(*args, **kwargs)
             else:
-                return jsonify(code=401, msg='Require roles.')
+                return jsonify(code=401, reason='Require roles.')
         return wrapper
     return decorator
 
@@ -43,7 +43,7 @@ def require(*required_args):
         def wrapper(*args, **kwargs):
             for arg in required_args:
                 if arg not in request.json:
-                    return jsonify(code=400, msg='Invalid arguments.')
+                    return jsonify(code=400, reason='Invalid arguments.')
             return func(*args, **kwargs)
         return wrapper
     return decorator
@@ -61,7 +61,7 @@ def login():
         session['role'] = udoc['role']
         return jsonify(code=200)
     else:
-        return jsonify(code=401, msg='Invalid username or password')
+        return jsonify(code=401, reason='Invalid username or password')
 
 @bp.route('/user/logout')
 @check_roles()
@@ -218,14 +218,14 @@ def create_user():
     password_hash = hash(password, salt)
 
     if not username:
-        return jsonify(code=402, msg='Username cannot be empty.')
+        return jsonify(code=402, reason='Username cannot be empty.')
 
     if not password:
-        return jsonify(code=402, msg='Password cannot be empty.')
+        return jsonify(code=402, reason='Password cannot be empty.')
 
     udoc = user.User.objects(username=username).first()
     if udoc:
-        return jsonify(code=411, msg='User already exist.')
+        return jsonify(code=411, reason='User already exist.')
 
     udoc = user.User(username=username, password_hash=password_hash, salt=salt, role=role, first=True)
     udoc.save()
@@ -238,7 +238,7 @@ def create_user():
 def update_user():
     password = request.json['password']
     if not password:
-        return jsonify(code=402, msg='Password cannot be empty.')
+        return jsonify(code=402, reason='Password cannot be empty.')
 
     udoc = user.User.objects(id=ObjectId(session['id'])).first()
 
@@ -263,16 +263,16 @@ def show_assignment_manage_list():
 def create_assignment():
     name = request.json['name']
     if not name:
-        return jsonify(code=402, msg='Name cannot be empty.')
+        return jsonify(code=402, reason='Name cannot be empty.')
 
     try:
         begin_at = datetime.datetime.fromtimestamp(request.json['begin_at'] / 1000)
         end_at = datetime.datetime.fromtimestamp(request.json['end_at'] / 1000)
     except:
-        return jsonify(code=403, msg='Invalid datetime.')
+        return jsonify(code=403, reason='Invalid datetime.')
 
     if begin_at > end_at:
-        return jsonify(code=403, msg='Invalid datetime, begin_at should be less than end_at.')
+        return jsonify(code=403, reason='Invalid datetime, begin_at should be less than end_at.')
 
     adoc = assignment.Assignment(
         name=name,
@@ -289,16 +289,16 @@ def create_assignment():
 def update_assignment(assignment_id):
     name = request.json['name']
     if not name:
-        return jsonify(code=402, msg='Name cannot be empty.')
+        return jsonify(code=402, reason='Name cannot be empty.')
 
     try:
         begin_at = datetime.datetime.fromtimestamp(request.json['begin_at'] / 1000)
         end_at = datetime.datetime.fromtimestamp(request.json['end_at'] / 1000)
     except:
-        return jsonify(code=403, msg='Invalid datetime.')
+        return jsonify(code=403, reason='Invalid datetime.')
 
     if begin_at > end_at:
-        return jsonify(code=403, msg='Invalid datetime, begin_at should be less than end_at.')
+        return jsonify(code=403, reason='Invalid datetime, begin_at should be less than end_at.')
 
     adoc = assignment.Assignment.objects(id=ObjectId(assignment_id)).first()
     if not adoc:
