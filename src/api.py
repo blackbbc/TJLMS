@@ -59,7 +59,7 @@ def login():
         session.permanent = True
         session['id'] = str(udoc['id'])
         session['role'] = udoc['role']
-        return jsonify(code=200)
+        return jsonify(code=200, data=udoc)
     else:
         return jsonify(code=401, reason='Invalid username or password')
 
