@@ -369,14 +369,10 @@ def create_problem(assignment_id):
 @require('ptext', 'qtexts')
 @check_roles([role.ADMIN, role.TA])
 def update_problem_content(problem_id):
-    qtexts = request.json['qtexts']
-    qdocs = []
-    for qtext in qtexts:
-        qdoc = question.Question(text=qtext)
-        qdocs.append(qdoc)
+    questions = request.json['questions']
     pdoc = problem.Problem.objects(id=ObjectId(problem_id)).first()
     pdoc['text'] = request.json['ptext']
-    pdoc['questions'] = qdocs
+    pdoc['questions'] = [question.Question(id=q['_id'], text=q['text']) for q in questions]
     pdoc.save()
     return jsonify(code=200, data=pdoc)
 
