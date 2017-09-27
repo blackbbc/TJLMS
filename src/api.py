@@ -81,7 +81,7 @@ def status():
 def show_assignment_list():
     adocs = (assignment.Assignment
         .objects(visible=True)
-        .order_by('-begin_at')
+        .order_by('-end_at')
         .all())
     return jsonify(code=200, data=adocs)
 
@@ -331,21 +331,82 @@ def manage_get_assignment(assignment_id):
             assignment_id=assignment_id).order_by('+order').all()
     return jsonify(code=200, data=adoc)
 
-@bp.route('/manage/assignment/submission/<string:assignment_id>')
+def get_submission_status(sdoc, qdocs):
+    n = 0
+    adocs_by_qid = { str(adoc.question_id): adoc for adoc in sdoc.answers }
+    for qdoc in qdocs:
+        if str(qdoc._id) in adocs_by_qid and len(adocs_by_qid[str(qdoc._id)].text.strip()) >= 1:
+            n = n + 1
+    return n / len(qdocs)
+
+@bp.route('/manage/assignment/<string:assignment_id>/submissions')
 @check_roles([role.ADMIN, role.TA])
 def manage_get_assignment_submissions(assignment_id):
-    sdocs = submission.Submission.objects(assignment_id=assignment_id).all()
-    ssdocs = []
+    adoc = (assignment.Assignment
+        .objects(id=assignment_id)
+        .first())
+    pdocs = (problem.Problem
+        .objects(assignment_id=assignment_id)
+        .order_by('+order')
+        .exclude('text')
+        .exclude('questions.text')
+        .all())
+    pdocs_by_id = { str(pdoc.id): pdoc for pdoc in pdocs }
+    udocs = (user.User
+        .objects()
+        .order_by('+_id')
+        .all())
+    udocs_by_id = { str(udoc.id): udoc for udoc in udocs }
+    sdocs = (submission.Submission
+        .objects(assignment_id=assignment_id)
+        .all())
 
-    for index in range(0, len(sdocs)):
-        sdoc = {}
-        sdoc['user'] = user.User.objects(id=sdocs[index]['user_id']).first()
-        sdoc['problem'] = problem.Problem.objects(id=sdocs[index]['problem_id']).first()
-        ssdocs.append(sdoc)
+    ssdocs = [{
+        '_id': str(sdoc.id),
+        'problem_id': str(sdoc.problem_id),
+        'user_id': str(sdoc.user_id),
+        'complete': get_submission_status(sdoc, pdocs_by_id[str(sdoc.problem_id)].questions),
+    } for sdoc in sdocs]
 
-    ssdocs.sort(key=functools.cmp_to_key(sort_submission))
+    data = {}
+    data['adoc'] = adoc
+    data['ssdocs'] = ssdocs
+    data['pdocs'] = pdocs
+    data['udocs'] = udocs
 
-    return jsonify(code=200, data=ssdocs)
+    return jsonify(code=200, data=data)
+
+@bp.route('/manage/submission/<string:submission_id>')
+@check_roles([role.ADMIN, role.TA])
+def manage_get_submission(submission_id):
+    sdoc = (submission.Submission
+        .objects(id=submission_id)
+        .first())
+    if not sdoc:
+        return jsonify(code=403, reason='Invalid submission')
+    udoc = (user.User
+        .objects(id=sdoc.user_id)
+        .first())
+    if not udoc:
+        return jsonify(code=403, reason='Broken submission. User not found.')
+    adoc = (assignment.Assignment
+        .objects(id=sdoc.assignment_id)
+        .first())
+    if not adoc:
+        return jsonify(code=403, reason='Broken submission. Assignment not found.')
+    pdoc = (problem.Problem
+        .objects(id=sdoc.problem_id)
+        .first())
+    if not pdoc:
+        return jsonify(code=403, reason='Broken submission. Problem not found.')
+
+    data = {};
+    data['sdoc'] = sdoc
+    data['adoc'] = adoc
+    data['pdoc'] = pdoc
+    data['udoc'] = udoc
+
+    return jsonify(code=200, data=data)
 
 @bp.route('/manage/create/problem/<string:assignment_id>', methods=['POST'])
 @require('order', 'ptext', 'qtexts', 'visible')
