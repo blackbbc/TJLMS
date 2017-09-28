@@ -12,6 +12,7 @@ from flask import session, request, render_template, redirect, url_for, escape, 
 from bson.objectid import ObjectId
 
 from mongoengine import connect
+from mongoengine import errors
 
 import error
 from model import answer, assignment, problem, question, role, submission, submission_history, user
@@ -47,6 +48,14 @@ def require(*required_args):
             return func(*args, **kwargs)
         return wrapper
     return decorator
+
+@bp.errorhandler(errors.ValidationError)
+def handle_mongo_validation_error(error):
+    return jsonify(code=400, reason='Invalid input: ' + str(error))
+
+@bp.errorhandler(Exception)
+def handle_all_exceptions(error):
+    return jsonify(code=500, reason='Server internal error: ' + str(error))
 
 @bp.route('/user/login', methods=['POST'])
 @require('username', 'password')
@@ -409,31 +418,28 @@ def manage_get_submission(submission_id):
     return jsonify(code=200, data=data)
 
 @bp.route('/manage/create/problem/<string:assignment_id>', methods=['POST'])
-@require('order', 'ptext', 'qtexts', 'visible')
+@require('order', 'text', 'questions', 'visible')
 @check_roles([role.ADMIN, role.TA])
 def create_problem(assignment_id):
-    qtexts = request.json['qtexts']
-    qdocs = []
-    for qtext in qtexts:
-        qdoc = question.Question(text=qtext)
-        qdocs.append(qdoc)
+    questions = request.json['questions']
+    qdocs = [question.Question(_id=q['_id'], text=q['text']) for q in questions]
     pdoc = problem.Problem(
         order=int(request.json['order']),
         assignment_id=ObjectId(assignment_id),
-        text=request.json['ptext'],
+        text=request.json['text'],
         questions=qdocs,
         visible=request.json['visible'])
     pdoc.save()
     return jsonify(code=200, data=pdoc)
 
 @bp.route('/manage/update/problem/<string:problem_id>/content', methods=['POST'])
-@require('ptext', 'qtexts')
+@require('questions', 'text')
 @check_roles([role.ADMIN, role.TA])
 def update_problem_content(problem_id):
     questions = request.json['questions']
     pdoc = problem.Problem.objects(id=ObjectId(problem_id)).first()
-    pdoc['text'] = request.json['ptext']
-    pdoc['questions'] = [question.Question(id=q['_id'], text=q['text']) for q in questions]
+    pdoc['text'] = request.json['text']
+    pdoc['questions'] = [question.Question(_id=q['_id'], text=q['text']) for q in questions]
     pdoc.save()
     return jsonify(code=200, data=pdoc)
 
