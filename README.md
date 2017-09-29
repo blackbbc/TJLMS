@@ -14,9 +14,7 @@ Run commands
 
 ```bash
 cd src
-export FLASK_APP=app.py
-export FLASK_DEBUG=1
-flask run
+python3 -m app
 ```
 
 Add admin account

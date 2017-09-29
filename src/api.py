@@ -34,7 +34,7 @@ def check_roles(roles=[role.ADMIN, role.TA, role.STUDENT]):
             if 'role' in session and session['role'] in roles:
                 return func(*args, **kwargs)
             else:
-                return jsonify(code=401, reason='Require roles.')
+                return jsonify(code=401, reason='您未登录或无权限访问此页')
         return wrapper
     return decorator
 
@@ -51,7 +51,7 @@ def require(*required_args):
 
 @bp.errorhandler(errors.ValidationError)
 def handle_mongo_validation_error(error):
-    return jsonify(code=400, reason='Invalid input: ' + str(error))
+    return jsonify(code=400, reason='无效输入：' + str(error))
 
 @bp.errorhandler(Exception)
 def handle_all_exceptions(error):
@@ -70,7 +70,7 @@ def login():
         session['role'] = udoc['role']
         return jsonify(code=200, data=udoc)
     else:
-        return jsonify(code=401, reason='Invalid username or password')
+        return jsonify(code=401, reason='用户名或密码错误')
 
 @bp.route('/user/logout')
 @check_roles()
@@ -84,6 +84,25 @@ def logout():
 def status():
     udoc = user.User.objects(id=ObjectId(session['id'])).first()
     return jsonify(code=200, data=udoc)
+
+@bp.route('/user/changePassword', methods=['POST'])
+@require('password')
+@check_roles()
+def change_password():
+    password = request.json['password']
+    if not password:
+        return jsonify(code=402, reason='密码不能为空')
+
+    udoc = user.User.objects(id=ObjectId(session['id'])).first()
+
+    salt = os.urandom(16)
+    password_hash = hash(password, salt)
+    udoc['salt'] = salt
+    udoc['password_hash'] = password_hash
+    udoc['first'] = False
+    udoc.save()
+
+    return jsonify(code=200)
 
 @bp.route('/assignment')
 @check_roles()
@@ -102,9 +121,9 @@ def show_assignment_detail(assignment_id):
                  visible=True)
         .first())
     if not adoc:
-        return jsonify(code=403, reason='Invalid assignment')
+        return jsonify(code=403, reason='作业未找到')
     if datetime.datetime.now() < adoc.begin_at:
-        return jsonify(code=403, reason='Assignment is not open')
+        return jsonify(code=403, reason='作业还未开放')
 
     adoc = adoc.to_mongo()
     adoc['problems'] = problem.Problem.objects(
@@ -124,16 +143,16 @@ def show_problem(assignment_id, problem_id):
                  visible=True)
         .first())
     if not adoc:
-        return jsonify(code=403, reason='Invalid assignment')
+        return jsonify(code=403, reason='作业未找到')
     if datetime.datetime.now() < adoc.begin_at:
-        return jsonify(code=403, reason='Assignment is not open')
+        return jsonify(code=403, reason='作业还未开放')
 
     pdoc = problem.Problem.objects(
         id=ObjectId(problem_id),
         assignment_id=assignment_id,
         visible=True).first()
     if not pdoc:
-        return jsonify(code=403, reason='Invalid problem')
+        return jsonify(code=403, reason='题目未找到')
 
     pdoc = pdoc.to_mongo()
     pdoc['submission'] = submission.Submission.objects(
@@ -153,18 +172,18 @@ def submit_problem(assignment_id, problem_id):
         id=ObjectId(assignment_id),
         visible=True).first()
     if not adoc:
-        return jsonify(code=403, reason='Invalid assignment')
+        return jsonify(code=403, reason='作业未找到')
     if now < adoc.begin_at:
-        return jsonify(code=403, reason='Assignment is not open')
+        return jsonify(code=403, reason='作业还未开放')
     if now > adoc.end_at:
-        return jsonify(code=403, read_only=True, reason='Assignment is closed')
+        return jsonify(code=403, read_only=True, reason='作业已过截止时间')
 
     pdoc = problem.Problem.objects(
         id=ObjectId(problem_id),
         assignment_id=assignment_id,
         visible=True).first()
     if not pdoc:
-        return jsonify(code=403, reason='Invalid problem')
+        return jsonify(code=403, reason='题目未找到')
 
     answers = request.json['answers']
     adocs = [answer.Answer(
@@ -237,25 +256,6 @@ def create_user():
         return jsonify(code=411, reason='User already exist.')
 
     udoc = user.User(username=username, password_hash=password_hash, salt=salt, role=role, first=True)
-    udoc.save()
-
-    return jsonify(code=200)
-
-@bp.route('/manage/user/update', methods=['POST'])
-@require('password')
-@check_roles()
-def update_user():
-    password = request.json['password']
-    if not password:
-        return jsonify(code=402, reason='Password cannot be empty.')
-
-    udoc = user.User.objects(id=ObjectId(session['id'])).first()
-
-    salt = os.urandom(16)
-    password_hash = hash(password, salt)
-    udoc['salt'] = salt
-    udoc['password_hash'] = password_hash
-    udoc['first'] = False
     udoc.save()
 
     return jsonify(code=200)
@@ -432,27 +432,42 @@ def create_problem(assignment_id):
     pdoc.save()
     return jsonify(code=200, data=pdoc)
 
-@bp.route('/manage/update/problem/<string:problem_id>/content', methods=['POST'])
-@require('questions', 'text')
+@bp.route('/manage/update/problem/<string:problem_id>', methods=['POST'])
+@require('questions', 'text', 'order', 'visible')
 @check_roles([role.ADMIN, role.TA])
-def update_problem_content(problem_id):
+def update_problem(problem_id):
     questions = request.json['questions']
     pdoc = problem.Problem.objects(id=ObjectId(problem_id)).first()
+    if not pdoc:
+        return jsonify(code=403, reason='Invalid problem')
+    pdoc['order'] = request.json['order']
+    pdoc['visible'] = request.json['visible']
     pdoc['text'] = request.json['text']
     pdoc['questions'] = [question.Question(_id=q['_id'], text=q['text']) for q in questions]
     pdoc.save()
     return jsonify(code=200, data=pdoc)
 
-@bp.route('/manage/update/problem/<string:problem_id>/meta', methods=['POST'])
-@require('assignment_id', 'order', 'visible')
+@bp.route('/manage/delete/problem/<string:problem_id>', methods=['POST'])
+@require()
 @check_roles([role.ADMIN, role.TA])
-def update_problem_meta(problem_id):
+def delete_problem(problem_id):
     pdoc = problem.Problem.objects(id=ObjectId(problem_id)).first()
-    pdoc['order'] = request.json['order']
-    pdoc['visible'] = request.json['visible']
-    pdoc['assignment_id'] = ObjectId(request.json['assignment_id'])
-    pdoc.save()
-    return jsonify(code=200, data=pdoc)
+    if not pdoc:
+        return jsonify(code=403, reason='Invalid problem')
+    pdoc.delete()
+    return jsonify(code=200)
+
+@bp.route('/manage/rearrange/problem', methods=['POST'])
+@require('problems')
+@check_roles([role.ADMIN, role.TA])
+def rearrange_problem():
+    problems = request.json['problems']
+    for p in problems:
+        pdoc = problem.Problem.objects(id=ObjectId(p['_id'])).first()
+        if pdoc:
+            pdoc['order'] = p['order']
+            pdoc.save()
+    return jsonify(code=200)
 
 @bp.route('/grade/<string:submission_id>', methods=['POST'])
 @require('grades')

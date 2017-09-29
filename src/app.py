@@ -9,7 +9,7 @@ from api import bp
 from util import json
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.config.from_pyfile('../app.cfg')
 app.json_encoder = json.MongoJSONEncoder
 app.register_blueprint(bp, url_prefix='/api')
 
