@@ -7,3 +7,8 @@ class Assignment(Document):
     begin_at = DateTimeField()
     end_at = DateTimeField()
     visible = BooleanField()
+    meta = {
+        'indexes': [
+            'visible',
+        ]
+    }

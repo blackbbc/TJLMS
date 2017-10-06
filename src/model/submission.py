@@ -12,3 +12,8 @@ class Submission(Document):
     acc_score = IntField(default = 0)
     created_at = DateTimeField()
     updated_at = DateTimeField()
+    meta = {
+        'indexes': [
+            ('assignment_id', 'user_id'),
+        ]
+    }

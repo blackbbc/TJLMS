@@ -15,7 +15,7 @@ from mongoengine import connect
 from mongoengine import errors
 
 import error
-from model import answer, assignment, problem, question, role, submission, submission_history, user
+from model import answer, assignment, problem, question, role, submission, submission_history, user, keystroke
 
 
 # Connect to mongodb://localhost:27017/tjlms without username && password
@@ -130,8 +130,8 @@ def show_assignment_detail(assignment_id):
         assignment_id=assignment_id,
         visible=True).order_by('+order').all()
     adoc['submissions'] = submission.Submission.objects(
-        user_id=ObjectId(session['id']),
-        assignment_id=assignment_id).all()
+        assignment_id=assignment_id,
+        user_id=ObjectId(session['id'])).all()
 
     return jsonify(code=200, data=adoc)
 
@@ -156,8 +156,8 @@ def show_problem(assignment_id, problem_id):
 
     pdoc = pdoc.to_mongo()
     pdoc['submission'] = submission.Submission.objects(
-        user_id=ObjectId(session['id']),
         assignment_id=assignment_id,
+        user_id=ObjectId(session['id']),
         problem_id=problem_id).first()
     pdoc['read_only'] = (datetime.datetime.now() > adoc.end_at)
     return jsonify(code=200, data=pdoc)
@@ -207,6 +207,47 @@ def submit_problem(assignment_id, problem_id):
     shdoc.save()
 
     return jsonify(code=200, data=sdoc)
+
+@bp.route('/assignment/<string:assignment_id>/<string:problem_id>/keys', methods=['POST'])
+@require('answerKeystrokes')
+@check_roles()
+def submit_problem_keystrokes(assignment_id, problem_id):
+    now = datetime.datetime.now()
+
+    adoc = assignment.Assignment.objects(
+        id=ObjectId(assignment_id),
+        visible=True).first()
+    if not adoc:
+        return jsonify(code=403, reason='作业未找到')
+    if now < adoc.begin_at:
+        return jsonify(code=403, reason='作业还未开放')
+    if now > adoc.end_at:
+        return jsonify(code=403, read_only=True, reason='作业已过截止时间')
+
+    pdoc = problem.Problem.objects(
+        id=ObjectId(problem_id),
+        assignment_id=assignment_id,
+        visible=True).first()
+    if not pdoc:
+        return jsonify(code=403, reason='题目未找到')
+
+    kdocs = []
+    answerKeystrokes = request.json['answerKeystrokes']
+    for question_id, keystrokes in answerKeystrokes.items():
+        for ks in keystrokes:
+            kdocs.append(keystroke.Keystroke(
+                assignment_id=assignment_id,
+                problem_id=problem_id,
+                question_id=question_id,
+                user_id=ObjectId(session['id']),
+                timestamp=ks[0],
+                event_type=ks[1],
+                keycode=ks[2]))
+
+    kdocs_raw = [doc.to_mongo() for doc in kdocs]
+    keystroke.Keystroke._get_collection().insert_many(kdocs_raw, ordered=False)
+
+    return jsonify(code=200)
 
 @bp.route('/assignment/history/list/<string:assignment_id>/<string:problem_id>')
 @check_roles()

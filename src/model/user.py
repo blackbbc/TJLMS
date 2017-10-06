@@ -14,3 +14,8 @@ class User(Document):
     student_number = IntField()
     realname = StringField()
     first = BooleanField(default=True)
+    meta = {
+        'indexes': [
+            'username',
+        ]
+    }

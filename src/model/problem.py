@@ -10,3 +10,8 @@ class Problem(Document):
     text = StringField()
     questions = ListField(EmbeddedDocumentField(question.Question))
     visible = BooleanField()
+    meta = {
+        'indexes': [
+            ('assignment_id', 'visible', 'order'),
+        ]
+    }
